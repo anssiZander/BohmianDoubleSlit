@@ -21,7 +21,6 @@ uniform int   uPaletteId;
 in vec2 vUV;
 out vec4 fragColor;
 
-// IQ palette
 vec3 palette(in float t, in vec3 a, in vec3 b, in vec3 c, in vec3 d)
 {
     return a + b*cos(6.283185*(c*t+d));
@@ -29,47 +28,47 @@ vec3 palette(in float t, in vec3 a, in vec3 b, in vec3 c, in vec3 d)
 
 void getPaletteParams(int id, out vec3 a, out vec3 b, out vec3 c, out vec3 d)
 {
-  // 0: Nebula
+  
   if(id==0){
     a=vec3(0.08,0.07,0.12); b=vec3(0.55,0.50,0.70); c=vec3(1.0); d=vec3(0.00,0.15,0.35);
   }
-  // 1: Synthwave
+  
   else if(id==1){
     a=vec3(0.06,0.02,0.10); b=vec3(0.85,0.35,0.95); c=vec3(1.0); d=vec3(0.00,0.10,0.25);
   }
-  // 2: Viridis-ish (cosine approximation)
+  
   else if(id==2){
     a=vec3(0.22,0.32,0.28); b=vec3(0.40,0.45,0.35); c=vec3(1.0); d=vec3(0.15,0.55,0.75);
   }
-  // 3: Inferno-ish
+  
   else if(id==3){
     a=vec3(0.10,0.02,0.02); b=vec3(0.90,0.45,0.20); c=vec3(1.0); d=vec3(0.00,0.08,0.20);
   }
-  // 4: Ice (blue/cyan)
+  
   else if(id==4){
     a=vec3(0.02,0.05,0.08); b=vec3(0.40,0.70,0.85); c=vec3(1.0); d=vec3(0.10,0.30,0.55);
   }
-  // 5: Plasma Drift (deep purple → electric blue)
+  
   else if(id==5){
     a=vec3(0.10,0.02,0.12); b=vec3(0.75,0.15,0.90); c=vec3(1.0); d=vec3(0.00,0.10,0.30);
   }
-  // 6: Arctic Aurora (teal → ice green)
+  
   else if(id==6){
     a=vec3(0.05,0.15,0.15); b=vec3(0.20,0.80,0.60); c=vec3(1.0); d=vec3(0.10,0.40,0.20);
   }
-  // 7: Solar Flare (fiery red/orange)
+  
   else if(id==7){
     a=vec3(0.15,0.05,0.00); b=vec3(0.95,0.50,0.10); c=vec3(1.0); d=vec3(0.00,0.05,0.15);
   }
-  // 8: Cosmic Dust (muted browns/golds with teal accents)
+  
   else if(id==8){
     a=vec3(0.20,0.15,0.10); b=vec3(0.60,0.50,0.30); c=vec3(1.0); d=vec3(0.10,0.30,0.25);
   }
-  // 9: Neon Noir (dark with neon cyan/magenta)
+  
   else if(id==9){
     a=vec3(0.02,0.02,0.02); b=vec3(0.00,0.80,0.80); c=vec3(1.0); d=vec3(0.90,0.10,0.90);
   }
-  // 10: Pastel Mirage (soft lavender, mint, peach)
+  
   else {
     a=vec3(0.75,0.70,0.80); b=vec3(0.60,0.85,0.70); c=vec3(1.0); d=vec3(0.10,0.20,0.30);
   }
@@ -107,7 +106,7 @@ void main(){
 
   vec3 a,b,c,d;
   int useId = uPaletteId;
-  // when palette5 selected and phase display is off, use palette2 colors
+  
   if(uPaletteId == 5 && uShowPhase == 0) {
     useId = 2;
   }
@@ -122,7 +121,7 @@ void main(){
     col = palette(I, a,b,c,d) * (0.15 + 0.85*I);
   }
 
-  // Barrier overlay
+  
   float wall = barrierWallMask(uv);
   float op = clamp(uBarrierOpacity, 0.0, 1.0);
   vec3 wallCol = vec3(0.20, 0.28, 0.35);

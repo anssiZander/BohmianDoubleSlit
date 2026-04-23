@@ -50,7 +50,7 @@ float barrierPotentialPx(vec2 xPx){
 float absorbW(vec2 xPx){
   if(uAbsorbPx <= 0.0) return 0.0;
 
-  // widen left-side absorbing region by 20%
+  
   float leftFactor = 1.20;
   float dx = min(xPx.x * leftFactor, float(uSimRes.x) - 1.0 - xPx.x);
   float dy = min(xPx.y, float(uSimRes.y) - 1.0 - xPx.y);
@@ -58,13 +58,12 @@ float absorbW(vec2 xPx){
 
   float t = clamp((uAbsorbPx - d) / max(uAbsorbPx, 1.0), 0.0, 1.0);
   
-  // Smooth cubic profile for gradual absorption
+  
   float profile = t * t * t;
   
   return uAbsorbStrength * profile;
 }
 
-// RHS: ∂ψ/∂t = i*(ħ/2m)∇²ψ - i*(V/ħ)ψ
 vec2 schrodingerRHS(vec2 psi, vec2 lapPsi, float V){
   float cLap = uHBAR / (2.0*uMass);
   float cV   = V / uHBAR;
@@ -79,7 +78,7 @@ vec2 initialPacketAtPx(vec2 xPx, float t){
   float amp = exp(-dot(d,d)/(2.0*sqr(uPacketSigmaPx)));
 
   float k  = uP0/uHBAR;
-  float phaseSpace = k * d.x;                 // +x momentum
+  float phaseSpace = k * d.x;                 
   float phaseTime  = -kineticEnergy() * t / uHBAR;
   return amp * cis(phaseSpace + phaseTime);
 }
@@ -89,7 +88,7 @@ void main() {
 
   vec2 psi0 = initialPacketAtPx(xPx, 0.0);
 
-  // Laplacian of initial packet (neighbor sampling)
+  
   vec2 psiE = initialPacketAtPx(xPx + vec2( 1.0, 0.0), 0.0);
   vec2 psiW = initialPacketAtPx(xPx + vec2(-1.0, 0.0), 0.0);
   vec2 psiN = initialPacketAtPx(xPx + vec2( 0.0, 1.0), 0.0);
@@ -100,7 +99,7 @@ void main() {
 
   vec2 rhs0 = schrodingerRHS(psi0, lap0, V);
 
-  // CAP damping at init (usually ~0 at packet location)
+  
   float W = absorbW(xPx);
   rhs0 += -(W / uHBAR) * psi0;
 

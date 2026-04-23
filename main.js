@@ -1,11 +1,3 @@
-// Bohmian Double Slit (WebGL2) — trail accumulation
-// Wave: Schrödinger leapfrog on RGBA32F ping-pong textures
-// Particles: Transform Feedback positions updated by Bohmian velocity
-// Trail: RGBA16F ping-pong buffer (cumulative visitation)
-// Render: Wave background + trail overlay + live particles
-//
-// Palette presets are IQ palettes controlled by paletteId.
-
 const canvas = document.getElementById("c");
 const gl = canvas.getContext("webgl2", { antialias: false, alpha: false, depth: false, stencil: false });
 if (!gl) throw new Error("WebGL2 not available.");
@@ -19,15 +11,12 @@ if (!extFloatRT) {
   throw new Error("Missing EXT_color_buffer_float");
 }
 
-// --------------------
-// Parameters
-// --------------------
 const params = {
   simScale: 1.0,
   stepsPerFrame: 50,
 
-  hbar: 6.0,  // hardcoded
-  mass: 1.0,  // hardcoded
+  hbar: 6.0,
+  mass: 1.0,
   p0: 1.5,
   dt: 0.01,
 
@@ -35,41 +24,39 @@ const params = {
   packetY: 0.50,
   packetSigma: 80.0,
 
-  barrierX: 0.55,  // hardcoded
-  barrierThick: 20.0,  // hardcoded barrier thickness
+  barrierX: 0.55,
+  barrierThick: 20.0,
   slitWidth: 25.0,
   slitSep: 60.0,
-  V0: 50.0,  // hardcoded
+  V0: 50.0,
 
   absorbPx: 110.0,
   absorbStrength: 0.25,
-  particleKillMargin: 12.0,  // hardcoded
+  particleKillMargin: 12.0,
 
   nParticles: 1000,
-  rhoMin: 1e-6,  // hardcoded
-  velClamp: 160.0,  // hardcoded
+  rhoMin: 1e-6,
+  velClamp: 160.0,
+  guidingMode: 0,
 
   visGain: 20.0,
   visGamma: 0.5,
   showPhase: 1,
 
-  // live particle visuals
   showParticles: 1,
   dotSize: 10.0,
   dotSigma: 0.28,
   dotGain: 1.,
 
-  // trail accumulation
   showTrail: 1,
-  trailHalfLife: 100.0,   // sim-time half-life; large => almost persistent
+  trailHalfLife: 100.0,
   trailVisGain: 1.,
-  trailVisGamma: 0.5,
-  trailStampGain: 0.55,   // hardcoded: how much each particle deposits
-  trailWidth: 4.0,        // stamp point-size in pixels (usually smaller than particle)
-  trailBlendMode: 1,      // 0=additive, 1=screen, 2=max
+  trailVisGamma: 1,
+  trailStampGain: 0.55,
+  trailWidth: 4.0,
+  trailBlendMode: 1,
 
-  // palette preset
-  paletteId: 5,             // 0..10 (expanded)
+  paletteId: 5,
 };
 
 const PALETTE_NAMES = [
@@ -86,26 +73,27 @@ const PALETTE_NAMES = [
   "Pastel Mirage"
 ];
 
-// approximate complementary boundary colors for each palette
 const PALETTE_COMPLEMENTS = [
-  [0.92,0.93,0.88], // light complement nebula
-  [0.10,0.60,0.10], // greenish complement to synthwave
-  [0.80,0.60,0.55], // warm complement to viridis
-  [0.10,0.60,0.80], // cool complement to inferno
-  [0.80,0.30,0.15], // warm complement ice
-  [0.20,0.80,0.30], // complement for plasma drift
-  [0.85,0.25,0.25], // complement for arctic aurora
-  [0.10,0.10,0.80], // complement for solar flare
-  [0.40,0.50,0.70], // complement for cosmic dust
-  [0.90,0.90,0.10], // complement for neon noir
-  [0.40,0.40,0.60]  // complement for pastel mirage
+  [0.92,0.93,0.88],
+  [0.10,0.60,0.10],
+  [0.80,0.60,0.55],
+  [0.10,0.60,0.80],
+  [0.80,0.30,0.15],
+  [0.20,0.80,0.30],
+  [0.85,0.25,0.25],
+  [0.10,0.10,0.80],
+  [0.40,0.50,0.70],
+  [0.90,0.90,0.10],
+  [0.40,0.40,0.60]
+];
+
+const GUIDING_MODE_NAMES = [
+  "Schrodinger",
+  "Pauli spin-1/2 (+z)"
 ];
 
 let paused = false;
 
-// --------------------
-// UI
-// --------------------
 const controls = document.getElementById("controls");
 const statsEl = document.getElementById("stats");
 
@@ -170,6 +158,37 @@ function addToggleInt(key, label) {
   controls.appendChild(row);
 }
 
+function addCycleButton(key, label, values, onChange = null) {
+  const row = document.createElement("div");
+  row.className = "row";
+
+  const lab = document.createElement("label");
+  lab.textContent = label;
+
+  const btn = document.createElement("button");
+  btn.style.flex = "1";
+
+  const sync = () => {
+    btn.textContent = values[params[key] | 0] ?? values[0];
+  };
+
+  sync();
+  btn.addEventListener("click", () => {
+    params[key] = (params[key] + 1) % values.length;
+    sync();
+    if (onChange) onChange(params[key] | 0);
+  });
+
+  const val = document.createElement("div");
+  val.className = "val";
+  val.textContent = "";
+
+  row.appendChild(lab);
+  row.appendChild(btn);
+  row.appendChild(val);
+  controls.appendChild(row);
+}
+
 function addSectionHeader(label) {
   const header = document.createElement("div");
   header.style.marginTop = "12px";
@@ -183,19 +202,19 @@ function addSectionHeader(label) {
   controls.appendChild(header);
 }
 
-// Controls
 addSlider("stepsPerFrame", "Steps/frame", 1, 100, 1);
 
-addSectionHeader("⚛ Physical Parameters");
+addSectionHeader("Physical Parameters");
 addSlider("p0", "Momentum p", 0.5, 8.0, 0.1);
 addSlider("dt", "dt", 0.005, 0.02, 0.001);
-addSlider("packetSigma", "packet σ", 8.0, 80.0, 1.0);
+addSlider("packetSigma", "packet sigma", 8.0, 80.0, 1.0);
 addSlider("slitWidth", "slit width", 6.0, 40.0, 1.0);
 addSlider("slitSep", "slit separation", 18.0, 140.0, 1.0);
 addSlider("absorbPx", "absorb boundary", 0.0, 160.0, 1.0);
 addSlider("nParticles", "particle count", 1, 3000, 1, () => rebuildParticles());
+addCycleButton("guidingMode", "guiding law", GUIDING_MODE_NAMES, () => resetAll());
 
-addSectionHeader("👁 Visual Parameters");
+addSectionHeader("Visual Parameters");
 addToggleInt("showPhase", "show phase");
 addToggleInt("showParticles", "show particles");
 addSlider("dotSize", "particle size", 2.0, 16.0, 0.5);
@@ -220,20 +239,17 @@ window.addEventListener("keydown", (e) => {
   if (e.key === " ") paused = !paused;
 });
 
-// Minimize UI panel
 const uiBody = document.getElementById("uibody");
 const minBtn = document.getElementById("minui");
+minBtn.textContent = "-";
 
 let uiMinimized = false;
 minBtn.onclick = () => {
   uiMinimized = !uiMinimized;
   uiBody.style.display = uiMinimized ? "none" : "block";
-  minBtn.textContent = uiMinimized ? "▸" : "▾";
+  minBtn.textContent = uiMinimized ? "+" : "-";
 };
 
-// --------------------
-// WebGL helpers
-// --------------------
 function compile(type, src) {
   const sh = gl.createShader(type);
   gl.shaderSource(sh, src);
@@ -306,9 +322,6 @@ async function loadText(url) {
   return await r.text();
 }
 
-// --------------------
-// Shader loading
-// --------------------
 const SH = {};
 async function loadShaders() {
   const base = "./shaders/";
@@ -328,9 +341,6 @@ async function loadShaders() {
   await Promise.all(files.map(async (f) => { SH[f] = await loadText(base + f); }));
 }
 
-// --------------------
-// Programs + uniforms
-// --------------------
 let progWaveInit, progWaveStep, progWaveRender;
 let progPartUpdate, progPartView, progPartStamp;
 let progDensityStep, progDensityRender;
@@ -338,7 +348,6 @@ let progBoundary;
 
 let U = {};
 
-// Kill boundary rendering
 let vaoKillBoundary = null;
 let boundaryBuffer = null;
 
@@ -420,6 +429,7 @@ function buildPrograms() {
     uHBAR: u(progPartUpdate, "uHBAR"),
     uMass: u(progPartUpdate, "uMass"),
     uDT: u(progPartUpdate, "uDT"),
+    uGuidingMode: u(progPartUpdate, "uGuidingMode"),
     uBarrierXFrac: u(progPartUpdate, "uBarrierXFrac"),
     uBarrierThickPx: u(progPartUpdate, "uBarrierThickPx"),
     uSlitWidthPx: u(progPartUpdate, "uSlitWidthPx"),
@@ -463,9 +473,6 @@ function buildPrograms() {
   };
 }
 
-// --------------------
-// State
-// --------------------
 const vaoEmpty = gl.createVertexArray();
 
 let simW = 0, simH = 0;
@@ -476,9 +483,6 @@ let particleSrc = null, particleDst = null, vaoParticles = null, tf = null;
 let densW = 0, densH = 0;
 let densTexA = null, densTexB = null, densFboA = null, densFboB = null, densFlip = 0;
 
-// --------------------
-// Resize
-// --------------------
 function resizeCanvas() {
   const dpr = Math.max(1, Math.min(2, window.devicePixelRatio || 1));
   const w = Math.floor(canvas.clientWidth * dpr);
@@ -486,9 +490,6 @@ function resizeCanvas() {
   if (canvas.width !== w || canvas.height !== h) { canvas.width = w; canvas.height = h; }
 }
 
-// --------------------
-// Wave uniforms
-// --------------------
 function setWaveInitUniforms() {
   gl.uniform2i(U.waveInit.uSimRes, simW, simH);
   gl.uniform1f(U.waveInit.uHBAR, params.hbar);
@@ -530,9 +531,6 @@ function setWaveStepUniforms(srcTex) {
   gl.uniform1f(U.waveStep.uAbsorbStrength, params.absorbStrength);
 }
 
-// --------------------
-// Wave init/step
-// --------------------
 function resetWave() {
   gl.bindVertexArray(vaoEmpty);
   gl.viewport(0, 0, simW, simH);
@@ -566,9 +564,6 @@ function waveStep() {
   flip = 1 - flip;
 }
 
-// --------------------
-// Particles
-// --------------------
 function randn() {
   let u = 0, v = 0;
   while (u === 0) u = Math.random();
@@ -634,6 +629,7 @@ function particleUpdate() {
   gl.uniform1f(U.partUpdate.uHBAR, params.hbar);
   gl.uniform1f(U.partUpdate.uMass, params.mass);
   gl.uniform1f(U.partUpdate.uDT, params.dt);
+  gl.uniform1i(U.partUpdate.uGuidingMode, params.guidingMode | 0);
 
   gl.uniform1f(U.partUpdate.uBarrierXFrac, params.barrierX);
   gl.uniform1f(U.partUpdate.uBarrierThickPx, params.barrierThick);
@@ -666,18 +662,12 @@ function particleUpdate() {
   gl.bindVertexArray(null);
 }
 
-// --------------------
-// Density fade from half-life (simulation time)
-// --------------------
 const LN2 = Math.log(2);
 function fadeFromHalfLife(halfLife, dtTotal) {
   if (halfLife <= 0) return 0.0;
   return Math.exp(-LN2 * (dtTotal / halfLife));
 }
 
-// --------------------
-// Density buffers
-// --------------------
 function rebuildDensity() {
   densW = canvas.width;
   densH = canvas.height;
@@ -714,7 +704,6 @@ function densityStepAndStamp() {
 
   const fade = fadeFromHalfLife(params.trailHalfLife, dtTotal);
 
-  // 1) fade old density into dst
   gl.useProgram(progDensityStep);
   gl.bindVertexArray(vaoEmpty);
   gl.bindFramebuffer(gl.FRAMEBUFFER, dstFbo);
@@ -728,7 +717,6 @@ function densityStepAndStamp() {
   gl.disable(gl.BLEND);
   gl.drawArrays(gl.TRIANGLES, 0, 3);
 
-  // 2) stamp particles additively to RED only
   gl.enable(gl.BLEND);
   gl.blendFunc(gl.SRC_ALPHA, gl.ONE);
   gl.colorMask(true, false, false, false);
@@ -754,9 +742,6 @@ function densityStepAndStamp() {
   densFlip = 1 - densFlip;
 }
 
-// --------------------
-// Barrier opacity helper (optional)
-// --------------------
 function computeBarrierOpacity() {
   const E = (params.p0 * params.p0) / (2 * params.mass);
   if (params.V0 <= 0) return 0.0;
@@ -766,28 +751,22 @@ function computeBarrierOpacity() {
   return Math.min(1.0, Math.max(0.20, 1.0 - T));
 }
 
-// --------------------
-// Draw kill boundary rectangle
-// --------------------
 function drawKillBoundary() {
-  // Calculate the freeze distance based on the same formula as particle_update.vert
+
   const base = params.absorbPx + params.particleKillMargin;
   const absDistX = 1.5 * base;
-  const absDistY = 1.0 * base;  // Note: Y uses 1.0, not 1.5
-  const freezeDistX = 1.5 * absDistX;  // = 2.25 * base
-  const freezeDistY = 1.5 * absDistY;  // = 1.5 * base
+  const absDistY = 1.0 * base;
+  const freezeDistX = 1.5 * absDistX;
+  const freezeDistY = 1.5 * absDistY;
 
-  // Convert from simulation coordinates to canvas coordinates
   const scaleX = canvas.width / simW;
   const scaleY = canvas.height / simH;
 
-  // Kill boundaries in canvas pixels
-  const leftBoundaryX = freezeDistX * 1.20 * scaleX;  // extend 20% further left
+  const leftBoundaryX = freezeDistX * 1.20 * scaleX;
   const rightBoundaryX = (simW - freezeDistX) * scaleX;
   const topBoundaryY = freezeDistY * scaleY;
   const bottomBoundaryY = (simH - freezeDistY) * scaleY;
 
-  // Create boundary shader if needed
   if (!progBoundary) {
     const vsSource = `#version 300 es
       precision mediump float;
@@ -815,12 +794,10 @@ function drawKillBoundary() {
     progBoundary = link(vs, fs);
   }
 
-  // Create VAO for rectangle if needed
   if (!vaoKillBoundary) {
     vaoKillBoundary = gl.createVertexArray();
     boundaryBuffer = gl.createBuffer();
 
-    // Two triangles forming a rectangle (in NDC coords)
     const rectVertices = new Float32Array([
       -1, -1,
        1, -1,
@@ -839,11 +816,8 @@ function drawKillBoundary() {
     gl.bindVertexArray(null);
   }
 
-  const boundaryThickness = 2; // pixels
+  const boundaryThickness = 2;
 
-  // Convert canvas pixel coordinates to NDC
-  // x: canvas [0, width] -> NDC [-1, 1]
-  // y: canvas [0, height] -> NDC [1, -1] (inverted!)
   const canvasToNDCX = (px) => (px * 2 / canvas.width) - 1;
   const canvasToNDCY = (py) => 1 - (py * 2 / canvas.height);
 
@@ -852,7 +826,6 @@ function drawKillBoundary() {
   gl.enable(gl.BLEND);
   gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
 
-  // determine complement color for current palette
   let comp = PALETTE_COMPLEMENTS[params.paletteId | 0] || [1,1,1];
   const alpha = 0.15;
   const colorLoc = gl.getUniformLocation(progBoundary, 'uBoundaryColor');
@@ -860,7 +833,6 @@ function drawKillBoundary() {
 
   const boundaryRectLoc = gl.getUniformLocation(progBoundary, 'uBoundaryRect');
 
-  // Draw left boundary (vertical line)
   gl.uniform4f(
     boundaryRectLoc,
     canvasToNDCX(leftBoundaryX),
@@ -870,7 +842,6 @@ function drawKillBoundary() {
   );
   gl.drawArrays(gl.TRIANGLES, 0, 6);
 
-  // Draw right boundary (vertical line)
   gl.uniform4f(
     boundaryRectLoc,
     canvasToNDCX(rightBoundaryX - boundaryThickness),
@@ -880,7 +851,6 @@ function drawKillBoundary() {
   );
   gl.drawArrays(gl.TRIANGLES, 0, 6);
 
-  // Draw top boundary (horizontal line)
   gl.uniform4f(
     boundaryRectLoc,
     -1,
@@ -890,7 +860,6 @@ function drawKillBoundary() {
   );
   gl.drawArrays(gl.TRIANGLES, 0, 6);
 
-  // Draw bottom boundary (horizontal line)
   gl.uniform4f(
     boundaryRectLoc,
     -1,
@@ -904,9 +873,6 @@ function drawKillBoundary() {
   gl.bindVertexArray(null);
 }
 
-// --------------------
-// Render
-// --------------------
 function render() {
   const waveTex = flip ? texB : texA;
   const densTex = densFlip ? densTexB : densTexA;
@@ -918,7 +884,6 @@ function render() {
   gl.clearColor(0, 0, 0, 1);
   gl.clear(gl.COLOR_BUFFER_BIT);
 
-  // wave background
   gl.useProgram(progWaveRender);
   gl.bindVertexArray(vaoEmpty);
 
@@ -945,21 +910,19 @@ function render() {
 
   gl.drawArrays(gl.TRIANGLES, 0, 3);
 
-  // trail overlay
   if (params.showTrail) {
     gl.enable(gl.BLEND);
 
-    // Different blending modes for better trail visibility
     if (params.trailBlendMode === 0) {
-      // Additive blending (original)
+
       gl.blendFunc(gl.SRC_ALPHA, gl.ONE);
     } else if (params.trailBlendMode === 1) {
-      // Screen blending - helps preserve individual trails
+
       gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_COLOR);
     } else if (params.trailBlendMode === 2) {
-      // Max blending - shows the brightest trails
+
       gl.blendFunc(gl.ONE, gl.ONE);
-      // For max blending, we need to modify the shader output
+
     }
 
     gl.useProgram(progDensityRender);
@@ -979,10 +942,8 @@ function render() {
     gl.disable(gl.BLEND);
   }
 
-  // kill boundary (rendered before particles so particles appear on top)
   drawKillBoundary();
 
-  // live particles (additive)
   if (params.showParticles) {
     gl.enable(gl.BLEND);
     gl.blendFunc(gl.SRC_ALPHA, gl.ONE);
@@ -1003,16 +964,14 @@ function render() {
   }
 }
 
-// --------------------
-// Stats
-// --------------------
-function updateStats() {
-  statsEl.innerHTML = '';
+function guidingModeLabel() {
+  return GUIDING_MODE_NAMES[params.guidingMode | 0] ?? GUIDING_MODE_NAMES[0];
 }
 
-// --------------------
-// Rebuild / reset
-// --------------------
+function updateStats() {
+  statsEl.innerHTML = `<b>Guiding</b>: ${guidingModeLabel()}`;
+}
+
 function rebuildSimulation() {
   resizeCanvas();
 
@@ -1036,9 +995,6 @@ function resetAll() {
   clearDensity();
 }
 
-// --------------------
-// Main
-// --------------------
 window.addEventListener("resize", () => rebuildSimulation());
 
 async function main() {
