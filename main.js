@@ -12,17 +12,17 @@ if (!extFloatRT) {
 }
 
 const params = {
-  simScale: 1.0,
-  stepsPerFrame: 30,
+  simScale: 0.5,
+  stepsPerFrame: 10,
 
   hbar: 6.0,
   mass: 1.0,
   p0: 1.5,
   dt: 0.02,
 
-  packetX: 0.30,
+  packetX: 0.4,
   packetY: 0.50,
-  packetSigma: 80.0,
+  packetSigma: 25.0,
 
   barrierX: 0.55,
   barrierThick: 20.0,
@@ -30,14 +30,16 @@ const params = {
   slitSep: 60.0,
   V0: 50.0,
 
-  absorbPx: 110.0,
-  absorbStrength: 1.,
-  particleKillMargin: 12.0,
+  absorbPx: 50.0,
+  absorbStrength: 2.0,
+  particleKillMargin: 1.0,
 
-  nParticles: 1000,
+  nParticles: 500,
   rhoMin: 1e-6,
   velClamp: 160.0,
   guidingMode: 0,
+  guidingChoice: 0,
+  spinSign: 1,
 
   visGain: 20.0,
   visGamma: 0.5,
@@ -89,7 +91,12 @@ const PALETTE_COMPLEMENTS = [
 
 const GUIDING_MODE_NAMES = [
   "Schrodinger",
-  "Pauli spin-1/2 (+z)"
+  "Pauli spin-1/2"
+];
+const GUIDING_CHOICE_NAMES = [
+  "Schrodinger",
+  "Pauli Up",
+  "Pauli Down"
 ];
 
 let paused = false;
@@ -189,6 +196,43 @@ function addCycleButton(key, label, values, onChange = null) {
   controls.appendChild(row);
 }
 
+function addChoiceButtons(key, label, values, onChange = null) {
+  const row = document.createElement("div");
+  row.className = "row";
+
+  const lab = document.createElement("label");
+  lab.textContent = label;
+
+  const group = document.createElement("div");
+  group.className = "button-group";
+
+  const buttons = values.map((value, index) => {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.textContent = value;
+    btn.addEventListener("click", () => {
+      if ((params[key] | 0) === index) return;
+      params[key] = index;
+      sync();
+      if (onChange) onChange(index);
+    });
+    group.appendChild(btn);
+    return btn;
+  });
+
+  function sync() {
+    const selected = params[key] | 0;
+    buttons.forEach((btn, index) => {
+      btn.classList.toggle("is-active", index === selected);
+    });
+  }
+
+  sync();
+  row.appendChild(lab);
+  row.appendChild(group);
+  controls.appendChild(row);
+}
+
 function addSectionHeader(label) {
   const header = document.createElement("div");
   header.style.marginTop = "12px";
@@ -202,6 +246,8 @@ function addSectionHeader(label) {
   controls.appendChild(header);
 }
 
+addSectionHeader("Performance");
+addSlider("simScale", "sim scale", 0.3, 1.0, 0.1, () => rebuildSimulation());
 addSlider("stepsPerFrame", "Steps/frame", 1, 100, 1);
 
 addSectionHeader("Physical Parameters");
@@ -211,8 +257,12 @@ addSlider("packetSigma", "packet sigma", 8.0, 80.0, 1.0);
 addSlider("slitWidth", "slit width", 6.0, 40.0, 1.0);
 addSlider("slitSep", "slit separation", 18.0, 140.0, 1.0);
 addSlider("absorbPx", "absorb boundary", 0.0, 160.0, 1.0);
-addSlider("nParticles", "particle count", 1, 3000, 1, () => rebuildParticles());
-addCycleButton("guidingMode", "guiding law", GUIDING_MODE_NAMES, () => resetAll());
+addSlider("nParticles", "particle count", 1, 3000, 10, () => rebuildParticles());
+addChoiceButtons("guidingChoice", "guiding law", GUIDING_CHOICE_NAMES, (choice) => {
+  params.guidingMode = choice === 0 ? 0 : 1;
+  params.spinSign = choice === 2 ? -1 : 1;
+  resetAll();
+});
 
 addSectionHeader("Visual Parameters");
 addToggleInt("showPhase", "show phase");
@@ -430,6 +480,7 @@ function buildPrograms() {
     uMass: u(progPartUpdate, "uMass"),
     uDT: u(progPartUpdate, "uDT"),
     uGuidingMode: u(progPartUpdate, "uGuidingMode"),
+    uSpinSign: u(progPartUpdate, "uSpinSign"),
     uBarrierXFrac: u(progPartUpdate, "uBarrierXFrac"),
     uBarrierThickPx: u(progPartUpdate, "uBarrierThickPx"),
     uSlitWidthPx: u(progPartUpdate, "uSlitWidthPx"),
@@ -630,6 +681,7 @@ function particleUpdate() {
   gl.uniform1f(U.partUpdate.uMass, params.mass);
   gl.uniform1f(U.partUpdate.uDT, params.dt);
   gl.uniform1i(U.partUpdate.uGuidingMode, params.guidingMode | 0);
+  gl.uniform1f(U.partUpdate.uSpinSign, params.spinSign);
 
   gl.uniform1f(U.partUpdate.uBarrierXFrac, params.barrierX);
   gl.uniform1f(U.partUpdate.uBarrierThickPx, params.barrierThick);
@@ -965,6 +1017,9 @@ function render() {
 }
 
 function guidingModeLabel() {
+  if ((params.guidingMode | 0) === 1) {
+    return `${GUIDING_MODE_NAMES[1]} (${params.spinSign > 0 ? "up" : "down"})`;
+  }
   return GUIDING_MODE_NAMES[params.guidingMode | 0] ?? GUIDING_MODE_NAMES[0];
 }
 
