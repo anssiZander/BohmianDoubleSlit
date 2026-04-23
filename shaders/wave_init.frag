@@ -57,9 +57,9 @@ float absorbW(vec2 xPx){
   float d  = min(dx, dy);
 
   float t = clamp((uAbsorbPx - d) / max(uAbsorbPx, 1.0), 0.0, 1.0);
-  
-  
-  float profile = t * t * t;
+
+  float s = t * t * t * (t * (t * 6.0 - 15.0) + 10.0);
+  float profile = s * s;
   
   return uAbsorbStrength * profile;
 }
@@ -99,11 +99,11 @@ void main() {
 
   vec2 rhs0 = schrodingerRHS(psi0, lap0, V);
 
-  
   float W = absorbW(xPx);
-  rhs0 += -(W / uHBAR) * psi0;
+  float absorbA = uDT * W / uHBAR;
 
-  vec2 psiPrev = psi0 - uDT * rhs0;
+  // First-order backward start-up for the leapfrog state with local damping.
+  vec2 psiPrev = psi0 - uDT * rhs0 + absorbA * psi0;
 
   fragColor = vec4(psi0, psiPrev);
 }

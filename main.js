@@ -13,12 +13,12 @@ if (!extFloatRT) {
 
 const params = {
   simScale: 1.0,
-  stepsPerFrame: 50,
+  stepsPerFrame: 30,
 
   hbar: 6.0,
   mass: 1.0,
   p0: 1.5,
-  dt: 0.01,
+  dt: 0.02,
 
   packetX: 0.30,
   packetY: 0.50,
@@ -31,7 +31,7 @@ const params = {
   V0: 50.0,
 
   absorbPx: 110.0,
-  absorbStrength: 0.25,
+  absorbStrength: 1.,
   particleKillMargin: 12.0,
 
   nParticles: 1000,
@@ -206,7 +206,7 @@ addSlider("stepsPerFrame", "Steps/frame", 1, 100, 1);
 
 addSectionHeader("Physical Parameters");
 addSlider("p0", "Momentum p", 0.5, 8.0, 0.1);
-addSlider("dt", "dt", 0.005, 0.02, 0.001);
+addSlider("dt", "dt", 0.01, 0.03, 0.01);
 addSlider("packetSigma", "packet sigma", 8.0, 80.0, 1.0);
 addSlider("slitWidth", "slit width", 6.0, 40.0, 1.0);
 addSlider("slitSep", "slit separation", 18.0, 140.0, 1.0);

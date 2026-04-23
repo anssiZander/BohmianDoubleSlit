@@ -52,9 +52,9 @@ float absorbW(vec2 xPx){
   float d  = min(dx, dy);
 
   float t = clamp((uAbsorbPx - d) / max(uAbsorbPx, 1.0), 0.0, 1.0);
-  
-  
-  float profile = t * t * t;
+
+  float s = t * t * t * (t * (t * 6.0 - 15.0) + 10.0);
+  float profile = s * s;
   
   return uAbsorbStrength * profile;
 }
@@ -92,12 +92,12 @@ void main() {
   
   vec2 rhs = schrodingerRHS(psi, lapPsi, V);
 
-  
   float W = absorbW(xPx);
-  rhs += -(W / uHBAR) * psi;
+  float absorbA = uDT * W / uHBAR;
 
-  
-  vec2 psiNext = psiPrev + 2.0 * uDT * rhs;
+  // Time-center the local absorber so the leapfrog update stays stable
+  // even when the absorbing potential is strong.
+  vec2 psiNext = ((1.0 - absorbA) * psiPrev + 2.0 * uDT * rhs) / (1.0 + absorbA);
 
   fragColor = vec4(psiNext, psi);
 }
