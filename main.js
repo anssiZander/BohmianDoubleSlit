@@ -222,12 +222,12 @@ addSlider("dotGain", "particle brightness", 0.1, 3.0, 0.1);
 
 addToggleInt("showTrail", "draw trails");
 addSlider("trailHalfLife", "trail half-life", 1.0, 150.0, 1.0);
-addSlider("trailVisGain", "trail gain", 0.1, 1.0, 0.1);
-addSlider("trailVisGamma", "trail gamma", 0.4, 2.0, 0.05);
+//addSlider("trailVisGain", "trail gain", 0.1, 1.0, 0.1);
+//addSlider("trailVisGamma", "trail gamma", 0.4, 2.0, 0.05);
 addSlider("trailWidth", "trail width (px)", 0.5, 10.0, 0.1);
 
-addSlider("visGain", "wave gain", 0.5, 20.0, 0.5);
-addSlider("visGamma", "wave gamma", 0.3, 2.0, 0.05);
+//addSlider("visGain", "wave gain", 0.5, 20.0, 0.5);
+//addSlider("visGamma", "wave gamma", 0.3, 2.0, 0.05);
 
 document.getElementById("reset").onclick = () => resetAll();
 document.getElementById("pause").onclick = (e) => {
