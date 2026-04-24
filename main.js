@@ -13,7 +13,7 @@ if (!extFloatRT) {
 
 const params = {
   simScale: 0.5,
-  stepsPerFrame: 10,
+  stepsPerFrame: 30,
 
   hbar: 6.0,
   mass: 1.0,
