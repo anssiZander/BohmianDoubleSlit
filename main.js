@@ -40,6 +40,7 @@ const params = {
   guidingMode: 0,
   guidingChoice: 0,
   spinSign: 1,
+  spinMagnitude: 0.5,
 
   visGain: 20.0,
   visGamma: 0.5,
@@ -258,6 +259,7 @@ addSlider("slitWidth", "slit width", 6.0, 40.0, 1.0);
 addSlider("slitSep", "slit separation", 18.0, 140.0, 1.0);
 addSlider("absorbPx", "absorb boundary", 0.0, 160.0, 1.0);
 addSlider("nParticles", "particle count", 1, 3000, 10, () => rebuildParticles());
+addSlider("spinMagnitude", "spin |s|", 0.0, 2.0, 0.5);
 addChoiceButtons("guidingChoice", "guiding law", GUIDING_CHOICE_NAMES, (choice) => {
   params.guidingMode = choice === 0 ? 0 : 1;
   params.spinSign = choice === 2 ? -1 : 1;
@@ -480,6 +482,7 @@ function buildPrograms() {
     uMass: u(progPartUpdate, "uMass"),
     uDT: u(progPartUpdate, "uDT"),
     uGuidingMode: u(progPartUpdate, "uGuidingMode"),
+    uSpinMagnitude: u(progPartUpdate, "uSpinMagnitude"),
     uSpinSign: u(progPartUpdate, "uSpinSign"),
     uBarrierXFrac: u(progPartUpdate, "uBarrierXFrac"),
     uBarrierThickPx: u(progPartUpdate, "uBarrierThickPx"),
@@ -681,6 +684,7 @@ function particleUpdate() {
   gl.uniform1f(U.partUpdate.uMass, params.mass);
   gl.uniform1f(U.partUpdate.uDT, params.dt);
   gl.uniform1i(U.partUpdate.uGuidingMode, params.guidingMode | 0);
+  gl.uniform1f(U.partUpdate.uSpinMagnitude, params.spinMagnitude);
   gl.uniform1f(U.partUpdate.uSpinSign, params.spinSign);
 
   gl.uniform1f(U.partUpdate.uBarrierXFrac, params.barrierX);
@@ -1018,7 +1022,7 @@ function render() {
 
 function guidingModeLabel() {
   if ((params.guidingMode | 0) === 1) {
-    return `${GUIDING_MODE_NAMES[1]} (${params.spinSign > 0 ? "up" : "down"})`;
+    return `${GUIDING_MODE_NAMES[1]} (${params.spinSign > 0 ? "up" : "down"}, |s| = ${fmt(params.spinMagnitude)} hbar)`;
   }
   return GUIDING_MODE_NAMES[params.guidingMode | 0] ?? GUIDING_MODE_NAMES[0];
 }
