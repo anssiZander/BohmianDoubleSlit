@@ -37,8 +37,8 @@ const params = {
   nParticles: 500,
   rhoMin: 1e-6,
   velClamp: 160.0,
-  guidingMode: 0,
-  guidingChoice: 0,
+  guidingMode: 1,
+  guidingChoice: 1,
   spinSign: 1,
   spinMagnitude: 0.5,
 
@@ -56,7 +56,7 @@ const params = {
   trailVisGain: 1.,
   trailVisGamma: 1,
   trailStampGain: 0.55,
-  trailWidth: 4.0,
+  trailWidth: 5.0,
   trailBlendMode: 1,
 
   paletteId: 5,
@@ -101,6 +101,8 @@ const GUIDING_CHOICE_NAMES = [
 ];
 
 let paused = false;
+let frameRecordingActive = false;
+let simulationReady = false;
 
 const controls = document.getElementById("controls");
 const statsEl = document.getElementById("stats");
@@ -1056,28 +1058,57 @@ function resetAll() {
 
 window.addEventListener("resize", () => rebuildSimulation());
 
+function advanceSimulationFrame() {
+  const steps = Math.max(0, Math.floor(params.stepsPerFrame));
+  for (let i = 0; i < steps; i++) {
+    waveStep();
+    particleUpdate();
+  }
+  densityStepAndStamp();
+}
+
+function drawSimulationFrame(advancePhysics) {
+  resizeCanvas();
+
+  if (advancePhysics) {
+    advanceSimulationFrame();
+  }
+
+  render();
+  updateStats();
+}
+
+window.BohmianDoubleSlit = {
+  ...(window.BohmianDoubleSlit || {}),
+  beginFrameRecording() {
+    frameRecordingActive = true;
+  },
+  endFrameRecording() {
+    frameRecordingActive = false;
+  },
+  isReady() {
+    return simulationReady;
+  },
+  renderRecordingFrame() {
+    if (!simulationReady) return;
+    drawSimulationFrame(!paused);
+  },
+};
+
 async function main() {
   await loadShaders();
   buildPrograms();
   rebuildSimulation();
   updateStats();
+  simulationReady = true;
 
   params.trailHalfLife*=0.99;
 
   requestAnimationFrame(function loop() {
-    resizeCanvas();
-
-    if (!paused) {
-      const steps = Math.floor(params.stepsPerFrame);
-      for (let i = 0; i < steps; i++) {
-        waveStep();
-        particleUpdate();
-      }
-      densityStepAndStamp();
+    if (!frameRecordingActive) {
+      drawSimulationFrame(!paused);
     }
 
-    render();
-    updateStats();
     requestAnimationFrame(loop);
   });
 }
