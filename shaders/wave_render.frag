@@ -118,7 +118,7 @@ void main(){
     float t = fract((ph + 3.14159265) / 6.2831853);
     col = palette(t, a,b,c,d) * I;
   } else {
-    col = palette(I, a,b,c,d) * (0.15 + 0.85*I);
+    col = palette(I, a,b,c,d) * I;
   }
 
   

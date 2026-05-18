@@ -242,7 +242,7 @@ function addSectionHeader(label) {
   header.style.marginBottom = "8px";
   header.style.fontSize = "11px";
   header.style.fontWeight = "700";
-  header.style.color = "#aaa";
+  header.style.color = "#9fbce0";
   header.style.textTransform = "uppercase";
   header.style.letterSpacing = "1px";
   header.textContent = label;
@@ -303,6 +303,65 @@ minBtn.onclick = () => {
   uiBody.style.display = uiMinimized ? "none" : "block";
   minBtn.textContent = uiMinimized ? "+" : "-";
 };
+
+const theoryPanel = document.getElementById("theory");
+const theoryBody = document.getElementById("theorybody");
+const theoryBtn = document.getElementById("mintheory");
+
+let theoryMinimized = true;
+function syncTheoryPanel() {
+  theoryPanel.classList.toggle("is-minimized", theoryMinimized);
+  theoryBody.hidden = theoryMinimized;
+  theoryBtn.textContent = theoryMinimized ? "+" : "-";
+  theoryBtn.setAttribute("aria-expanded", String(!theoryMinimized));
+}
+
+theoryBtn.onclick = () => {
+  theoryMinimized = !theoryMinimized;
+  syncTheoryPanel();
+};
+syncTheoryPanel();
+
+const view = {
+  zoom: 1,
+  offsetX: 0,
+  offsetY: 0,
+};
+
+function clampViewOffset() {
+  const w = canvas.clientWidth;
+  const h = canvas.clientHeight;
+  const minX = w * (1 - view.zoom);
+  const minY = h * (1 - view.zoom);
+  view.offsetX = Math.min(0, Math.max(minX, view.offsetX));
+  view.offsetY = Math.min(0, Math.max(minY, view.offsetY));
+}
+
+function applyViewTransform() {
+  clampViewOffset();
+  canvas.style.transformOrigin = "0 0";
+  canvas.style.transform = `translate(${view.offsetX}px, ${view.offsetY}px) scale(${view.zoom})`;
+}
+
+canvas.addEventListener("wheel", (e) => {
+  e.preventDefault();
+
+  const rect = canvas.parentElement.getBoundingClientRect();
+  const cursorX = e.clientX - rect.left;
+  const cursorY = e.clientY - rect.top;
+  const oldZoom = view.zoom;
+  const zoomFactor = Math.exp(-e.deltaY * 0.0012);
+  const nextZoom = Math.min(8, Math.max(1, oldZoom * zoomFactor));
+
+  if (nextZoom === oldZoom) return;
+
+  const worldX = (cursorX - view.offsetX) / oldZoom;
+  const worldY = (cursorY - view.offsetY) / oldZoom;
+  view.zoom = nextZoom;
+  view.offsetX = cursorX - worldX * nextZoom;
+  view.offsetY = cursorY - worldY * nextZoom;
+  applyViewTransform();
+}, { passive: false });
 
 function compile(type, src) {
   const sh = gl.createShader(type);
@@ -1056,7 +1115,10 @@ function resetAll() {
   clearDensity();
 }
 
-window.addEventListener("resize", () => rebuildSimulation());
+window.addEventListener("resize", () => {
+  rebuildSimulation();
+  applyViewTransform();
+});
 
 function advanceSimulationFrame() {
   const steps = Math.max(0, Math.floor(params.stepsPerFrame));
