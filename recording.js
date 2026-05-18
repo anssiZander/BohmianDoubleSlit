@@ -128,18 +128,15 @@
     if (!button) return;
     const recording = isRecording();
     const supported = canRecordCanvas();
-    const text = recording ? "Stop Recording" : (state.finalizing ? "Saving Recording..." : (state.pendingBlob ? "Download Recording" : "Start Recording"));
+    const text = state.finalizing ? "Saving Recording..." : (recording ? "Stop Recording" : "Start Recording");
     if (button.textContent !== text) button.textContent = text;
     button.classList.toggle("recording", recording);
-    button.disabled = state.finalizing || (!state.pendingBlob && !supported);
-    button.title = state.pendingBlob
-      ? "Download the most recent canvas-only WebM recording."
-      : (supported ? "Records the simulation canvas only; UI overlays are excluded." : "WebM canvas recording is not supported by this browser.");
+    button.disabled = state.finalizing || !supported;
+    button.title = supported ? "Records the simulation canvas only; UI overlays are excluded." : "WebM canvas recording is not supported by this browser.";
   }
 
   function toggleRecording() {
-    if (state.pendingBlob && !isRecording()) downloadPendingRecording(true);
-    else if (isRecording()) stopRecording();
+    if (isRecording()) stopRecording();
     else startRecording();
   }
 
@@ -276,7 +273,7 @@
     state.pendingFileName = recordingFileName();
     state.recorder = null;
     state.finalizing = false;
-    downloadPendingRecording(false);
+    downloadPendingRecording(true);
     syncRecordingButton();
   }
 
@@ -358,8 +355,12 @@
     anchor.click();
     anchor.remove();
     if (clearAfterClick) {
+      state.pendingBlob = null;
+      state.pendingFileName = "";
+      if (state.lastUrl === url) state.lastUrl = null;
+      syncRecordingButton();
       setTimeout(() => {
-        if (state.lastUrl === url) clearPendingRecording();
+        URL.revokeObjectURL(url);
         syncRecordingButton();
       }, 1000);
     }

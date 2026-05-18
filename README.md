@@ -12,3 +12,7 @@ WebGL2 Bohmian mechanics double-slit simulation with two selectable guiding laws
 - `Reset` restarts the wave, particles, and trails.
 - `Pause` stops time stepping.
 - `R` resets the simulation.
+
+## License and Credit
+
+This project is released under the MIT License. Copyright (c) 2026 anssiZander. See `LICENSE` for the full license text.
