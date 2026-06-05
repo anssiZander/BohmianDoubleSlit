@@ -260,7 +260,6 @@ addSlider("packetSigma", "packet sigma", 8.0, 80.0, 1.0);
 addSlider("slitWidth", "slit width", 6.0, 40.0, 1.0);
 addSlider("slitSep", "slit separation", 18.0, 140.0, 1.0);
 addSlider("absorbPx", "absorb boundary", 0.0, 60.0, 1.0);
-addSlider("nParticles", "particle count", 1, 3000, 10, () => rebuildParticles());
 addSlider("spinMagnitude", "spin |s|", 0.0, 2.0, 0.5);
 addChoiceButtons("guidingChoice", "guiding law", GUIDING_CHOICE_NAMES, (choice) => {
   params.guidingMode = choice === 0 ? 0 : 1;
@@ -271,6 +270,7 @@ addChoiceButtons("guidingChoice", "guiding law", GUIDING_CHOICE_NAMES, (choice) 
 addSectionHeader("Visual Parameters");
 addToggleInt("showPhase", "show phase");
 addToggleInt("showParticles", "show particles");
+addSlider("nParticles", "particle count", 1, 3000, 10, () => rebuildParticles());
 addSlider("dotSize", "particle size", 2.0, 16.0, 0.5);
 addSlider("dotGain", "particle brightness", 0.1, 3.0, 0.1);
 
