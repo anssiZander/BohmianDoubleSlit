@@ -27,6 +27,9 @@ uniform float uAbsorbPx;
 uniform float uRhoMin;
 uniform float uVelClamp;
 
+const bool HIDE_REFLECTED_PARTICLES = false;
+const float REFLECTED_VX_THRESHOLD = -0.5;
+
 float band(float x, float c, float halfW, float feather) {
   return smoothstep(c - halfW - feather, c - halfW, x) *
          (1.0 - smoothstep(c + halfW, c + halfW + feather, x));
@@ -188,6 +191,15 @@ void main() {
   }
 
   vec2 v1 = guidingVelocity(x);
+  float barrierX = uBarrierXFrac * float(uSimRes.x);
+  if (HIDE_REFLECTED_PARTICLES &&
+      x.x < barrierX &&
+      v1.x < REFLECTED_VX_THRESHOLD) {
+    vState = vec4(-10.0, -10.0, 0.0, 0.0);
+    gl_Position = vec4(-2.0);
+    return;
+  }
+
   vec2 xm = clamp(x + 0.5 * uDT * v1, vec2(0.0), vec2(uSimRes) - vec2(1.0));
 
   BoundaryAction actM = boundaryAction(xm);
@@ -198,6 +210,14 @@ void main() {
   }
 
   vec2 v2 = guidingVelocity(xm);
+  if (HIDE_REFLECTED_PARTICLES &&
+      xm.x < barrierX &&
+      v2.x < REFLECTED_VX_THRESHOLD) {
+    vState = vec4(-10.0, -10.0, 0.0, 0.0);
+    gl_Position = vec4(-2.0);
+    return;
+  }
+
   vec2 xn = x + uDT * v2;
 
   BoundaryAction actN = boundaryAction(xn);
