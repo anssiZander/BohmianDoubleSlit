@@ -35,7 +35,7 @@ const params = {
 
   packetX: 0.4,
   packetY: 0.50,
-  packetSigma: 25.0,
+  packetSigma: 35.0,
 
   barrierX: 0.55,
   barrierThick: 10.0,
@@ -62,7 +62,7 @@ const params = {
 
   showParticles: 1,
   colorCodeUpDown: 1,
-  colorCodeRightLeft: 1,
+  colorCodeRightLeft: 0,
   colorCodeRadial: 0,
   dotSize: 12.0,
   dotSigma: 0.28,
