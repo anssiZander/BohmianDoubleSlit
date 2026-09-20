@@ -2,7 +2,8 @@
 precision highp float;
 precision highp sampler2D;
 
-layout(location=0) in vec4 aState;
+// mode: 0 dead, 1 moving, 2 left detection, 3 right, 4 bottom, 5 top.
+layout(location=0) in vec4 aState; // x, y, mode, color groups (quadrant bits 0–1, radial bits 2–3)
 out vec4 vState;
 
 uniform sampler2D uState;
@@ -23,12 +24,22 @@ uniform float uParticleKillMarginPx;
 uniform float uV0;
 
 uniform float uAbsorbPx;
+uniform float uVerticalDetectorInset;
+uniform float uBoundaryFreezeChance;
+uniform int uPhysicsFrame;
 
 uniform float uRhoMin;
 uniform float uVelClamp;
 
-const bool HIDE_REFLECTED_PARTICLES = false;
-const float REFLECTED_VX_THRESHOLD = -0.5;
+float random01(float seed) {
+  return fract(sin(seed) * 43758.5453123);
+}
+
+bool boundaryDetectionRoll() {
+  float chance = clamp(uBoundaryFreezeChance, 0.0, 1.0);
+  float seed = float(gl_VertexID + 1) * 12.9898 + float(uPhysicsFrame + 1) * 78.233;
+  return random01(seed) < chance;
+}
 
 float band(float x, float c, float halfW, float feather) {
   return smoothstep(c - halfW - feather, c - halfW, x) *
@@ -53,44 +64,45 @@ float barrierWallMaskAtPx(vec2 xPx) {
 struct BoundaryAction {
   bool freeze;
   vec2 frozenPos;
+  float detectedMode;
 };
 
 BoundaryAction boundaryAction(vec2 xPx) {
   float base = uAbsorbPx + uParticleKillMarginPx;
   float absDistX = 1.5 * base;
-  float absDistY = 1.0 * base;
   float freezeDistX = 1.5 * absDistX;
   float freezeDistXLeft = freezeDistX * 1.20;
-  float freezeDistY = 1.5 * absDistY;
+  float freezeDistY = uVerticalDetectorInset;
 
   float w = float(uSimRes.x) - 1.0;
   float h = float(uSimRes.y) - 1.0;
 
   BoundaryAction a;
   a.freeze = false;
-  a.frozenPos = xPx;
+  a.detectedMode = 0.0;
+  a.frozenPos = clamp(xPx, vec2(0.0), vec2(w, h));
 
   if (xPx.x < freezeDistXLeft) {
     a.freeze = true;
-    a.frozenPos = vec2(freezeDistXLeft, clamp(xPx.y, 0.0, h));
+    a.detectedMode = 2.0;
     return a;
   }
 
   if (xPx.x > (w - freezeDistX)) {
     a.freeze = true;
-    a.frozenPos = vec2(w - freezeDistX, clamp(xPx.y, 0.0, h));
+    a.detectedMode = 3.0;
     return a;
   }
 
   if (xPx.y < freezeDistY) {
     a.freeze = true;
-    a.frozenPos = vec2(clamp(xPx.x, 0.0, w), freezeDistY);
+    a.detectedMode = 4.0;
     return a;
   }
 
   if (xPx.y > (h - freezeDistY)) {
     a.freeze = true;
-    a.frozenPos = vec2(clamp(xPx.x, 0.0, w), h - freezeDistY);
+    a.detectedMode = 5.0;
     return a;
   }
 
@@ -98,8 +110,9 @@ BoundaryAction boundaryAction(vec2 xPx) {
 }
 
 vec2 samplePsiBilinear(vec2 xPx) {
-  vec2 maxX = vec2(uSimRes) - vec2(1.0001);
-  vec2 x = clamp(xPx, vec2(0.0), maxX);
+  // Wave samples live at pixel centers (i + 0.5); positions use domain coordinates.
+  vec2 maxX = vec2(uSimRes) - vec2(1.0);
+  vec2 x = clamp(xPx - vec2(0.5), vec2(0.0), maxX);
 
   vec2 x0 = floor(x);
   vec2 f = x - x0;
@@ -179,54 +192,38 @@ void main() {
   }
 
   BoundaryAction act0 = boundaryAction(x);
+  bool detectedAtBoundary = boundaryDetectionRoll();
   if (barrierWallMaskAtPx(x) > 0.5) {
-    vState = vec4(-10.0, -10.0, 0.0, 0.0);
+    vState = vec4(-10.0, -10.0, 0.0, aState.w);
     gl_Position = vec4(-2.0);
     return;
   }
-  if (act0.freeze) {
-    vState = vec4(act0.frozenPos, 2.0, 0.0);
+  if (act0.freeze && detectedAtBoundary) {
+    vState = vec4(act0.frozenPos, act0.detectedMode, aState.w);
     gl_Position = vec4(-2.0);
     return;
   }
 
   vec2 v1 = guidingVelocity(x);
-  float barrierX = uBarrierXFrac * float(uSimRes.x);
-  if (HIDE_REFLECTED_PARTICLES &&
-      x.x < barrierX &&
-      v1.x < REFLECTED_VX_THRESHOLD) {
-    vState = vec4(-10.0, -10.0, 0.0, 0.0);
-    gl_Position = vec4(-2.0);
-    return;
-  }
-
   vec2 xm = clamp(x + 0.5 * uDT * v1, vec2(0.0), vec2(uSimRes) - vec2(1.0));
 
   BoundaryAction actM = boundaryAction(xm);
-  if (actM.freeze) {
-    vState = vec4(actM.frozenPos, 2.0, 0.0);
+  if (actM.freeze && detectedAtBoundary) {
+    vState = vec4(actM.frozenPos, actM.detectedMode, aState.w);
     gl_Position = vec4(-2.0);
     return;
   }
 
   vec2 v2 = guidingVelocity(xm);
-  if (HIDE_REFLECTED_PARTICLES &&
-      xm.x < barrierX &&
-      v2.x < REFLECTED_VX_THRESHOLD) {
-    vState = vec4(-10.0, -10.0, 0.0, 0.0);
-    gl_Position = vec4(-2.0);
-    return;
-  }
-
   vec2 xn = x + uDT * v2;
 
   BoundaryAction actN = boundaryAction(xn);
-  if (actN.freeze) {
-    vState = vec4(actN.frozenPos, 2.0, 0.0);
+  if (actN.freeze && detectedAtBoundary) {
+    vState = vec4(actN.frozenPos, actN.detectedMode, aState.w);
     gl_Position = vec4(-2.0);
     return;
   }
 
-  vState = vec4(xn, 1.0, 0.0);
+  vState = vec4(xn, 1.0, aState.w);
   gl_Position = vec4(-2.0);
 }

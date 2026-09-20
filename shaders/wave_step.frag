@@ -17,6 +17,8 @@ uniform float uSlitSepPx;
 uniform float uV0;
 
 uniform float uAbsorbPx;        
+uniform float uAbsorbYPx;
+uniform float uAbsorbYStrength;
 uniform float uAbsorbStrength;  
 
 out vec4 fragColor;
@@ -42,21 +44,18 @@ float barrierPotentialPx(vec2 xPx){
   return uV0 * wall;
 }
 
-float absorbW(vec2 xPx){
-  if(uAbsorbPx <= 0.0) return 0.0;
-
-  
-  float leftFactor = 1.20;
-  float dx = min(xPx.x * leftFactor, float(uSimRes.x) - 1.0 - xPx.x);
-  float dy = min(xPx.y, float(uSimRes.y) - 1.0 - xPx.y);
-  float d  = min(dx, dy);
-
-  float t = clamp((uAbsorbPx - d) / max(uAbsorbPx, 1.0), 0.0, 1.0);
-
+float absorberProfile(float distance, float width){
+  if(width <= 0.0) return 0.0;
+  float t = clamp((width - distance) / width, 0.0, 1.0);
   float s = t * t * t * (t * (t * 6.0 - 15.0) + 10.0);
-  float profile = s * s;
-  
-  return uAbsorbStrength * profile;
+  return s * s;
+}
+
+float absorbW(vec2 xPx){
+  float dx = min(xPx.x * 1.20, float(uSimRes.x) - xPx.x);
+  float dy = min(xPx.y, float(uSimRes.y) - xPx.y);
+  // The vertical ramp is wider and entirely in the offscreen extension.
+  return max(uAbsorbStrength * absorberProfile(dx, uAbsorbPx), uAbsorbYStrength * absorberProfile(dy, uAbsorbYPx));
 }
 
 vec2 fetchPsi(ivec2 q){
@@ -86,7 +85,8 @@ void main() {
   vec2 psiS = fetchPsi(p + ivec2( 0,-1));
   vec2 lapPsi = (psiE + psiW + psiN + psiS - 4.0*psi);
 
-  vec2 xPx = vec2(p);
+  // Use the same pixel centers as initialization, rendering, and particle sampling.
+  vec2 xPx = gl_FragCoord.xy;
   float V = barrierPotentialPx(xPx);
 
   

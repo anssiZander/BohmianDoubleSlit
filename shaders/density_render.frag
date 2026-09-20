@@ -2,64 +2,54 @@
 precision highp float;
 precision highp sampler2D;
 
-uniform sampler2D uDensity;  
+uniform sampler2D uDensity;
 uniform float uGain;
 uniform float uGamma;
-uniform int   uPaletteId;
-uniform int   uBlendMode;  
+uniform int uBlendMode;
+uniform int uColorCodeMask;
 
 in vec2 vUV;
 out vec4 fragColor;
 
-vec3 palette(in float t, in vec3 a, in vec3 b, in vec3 c, in vec3 d)
-{
-    return a + b*cos(6.283185*(c*t+d));
-}
-
-void getPaletteParams(int id, out vec3 a, out vec3 b, out vec3 c, out vec3 d)
-{
-  
-  
-
-  if(id==0){ 
-    a=vec3(0.04,0.05,0.08); b=vec3(0.60,0.55,0.75); c=vec3(1.0); d=vec3(0.10,0.25,0.50);
-  } else if(id==1){ 
-    a=vec3(0.05,0.02,0.08); b=vec3(0.95,0.45,0.95); c=vec3(1.0); d=vec3(0.05,0.20,0.55);
-  } else if(id==2){ 
-    a=vec3(0.10,0.20,0.18); b=vec3(0.55,0.65,0.45); c=vec3(1.0); d=vec3(0.15,0.45,0.70);
-  } else if(id==3){ 
-    a=vec3(0.08,0.02,0.01); b=vec3(0.95,0.55,0.25); c=vec3(1.0); d=vec3(0.05,0.15,0.30);
-  } else { 
-    a=vec3(0.02,0.06,0.10); b=vec3(0.50,0.85,1.00); c=vec3(1.0); d=vec3(0.10,0.30,0.60);
-  }
+vec3 pathColor(int group) {
+  if (group == 1) return vec3(0.15, 0.95, 1.00);
+  if (group == 2) return vec3(1.00, 0.28, 0.18);
+  if (group == 3) return vec3(0.74, 0.32, 1.00);
+  return vec3(1.0, 1.0, 0.0);
 }
 
 void main(){
+  // The selected texture holds either four starting quadrants or four radial bands.
   vec4 dacc = max(texture(uDensity, vUV), vec4(0.0));
-
-  
-  float v = max(max(dacc.r, dacc.g), dacc.b);
-  v = 1.0 - exp(-uGain * v);
+  float density = dot(dacc, vec4(1.0));
+  float exposure = uGain * density;
+  float v = 1.0 - exp(-exposure);
   v = pow(clamp(v, 0.0, 1.0), uGamma);
 
-  vec3 a,b,c,d;
-  getPaletteParams(uPaletteId, a,b,c,d);
+  vec3 col = vec3(0.0);
+  if (density > 1e-5) {
+    for (int quadrant = 0; quadrant < 4; quadrant++) {
+      col += dacc[quadrant] * pathColor(uColorCodeMask == 4 ? quadrant : (quadrant & uColorCodeMask));
+    }
+    col /= density;
+  }
 
-  
-  
-  vec3 col = vec3(1.0, 1.0, 0.0);
+  if (uColorCodeMask == 0) {
+    col = vec3(1.0, 0.92, 0.08);
+  } else {
+    float crowded = smoothstep(1.0, 3.0, exposure);
+    float oversaturated = smoothstep(3.0, 5.0, exposure);
+    vec3 overlapHue = mix(
+      vec3(1.0, 0.55, 0.08),
+      vec3(1.0, 0.35, 0.62),
+      oversaturated
+    );
+    col = mix(col, overlapHue, 0.18 * crowded + 0.12 * oversaturated);
+  }
 
   if (uBlendMode == 0) {
-    
     fragColor = vec4(col, v);
-  } else if (uBlendMode == 1) {
-    
-    fragColor = vec4(col * v, 1.0 - v);
-  } else if (uBlendMode == 2) {
-    
-    fragColor = vec4(col * v, 1.0);
   } else {
-    
-    fragColor = vec4(col, v);
+    fragColor = vec4(col * v, 1.0);
   }
 }
